@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JASS syntax highlighter</title>
+<!--
+  Live syntax highlighter for the JASS TextMate grammar.
+
+  Tokenises with the real engine VS Code uses (vscode-textmate + vscode-oniguruma,
+  pinned below from jsdelivr) against syntaxes/jass.tmLanguage.json, so what you see
+  here is what the editor produces. Type, paste, or drop a .j/.ai/.jass file.
+
+  Deployed from master at https://drake53.github.io/language-jass/ by .github/workflows/pages.yml.
+  To run it locally, serve the repo root so the grammar can be fetched, e.g.: python3 -m http.server
+  When opened via file:// instead, use the "load grammar" picker that appears.
+
+  Highlighting updates synchronously per keystroke: only the lines from the first
+  edit onward are retokenised, and tokenisation stops as soon as the TextMate rule
+  stack converges with the cached stack of the following line.
+-->
+<script src="https://cdn.jsdelivr.net/npm/vscode-oniguruma@2.0.1/release/main.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vscode-textmate@9.3.2/release/main.js"></script>
+<style>
+  :root {
+    --bg: #f3f4f2;
+    --panel: #ffffff;
+    --border: #e0e2dd;
+    --ink: #23282b;
+    --muted: #67707a;
+    --accent: #8a6d1f;
+    --c-d: #1f2328;
+    --c-cm: #008000;
+    --c-str: #a31515;
+    --c-num: #098658;
+    --c-lang: #0000ff;
+    --c-esc: #ee0000;
+    --c-inv: #cd3131;
+    --c-kwc: #af00db;
+    --c-kwop: #24292e;
+    --c-kw: #0000ff;
+    --c-fn: #795e26;
+    --c-typ: #267f99;
+    --c-var: #001080;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171a;
+      --panel: #1e1e1e;
+      --border: #2a2e33;
+      --ink: #d9dee3;
+      --muted: #8a939e;
+      --accent: #d4a843;
+      --c-d: #d4d4d4;
+      --c-cm: #6a9955;
+      --c-str: #ce9178;
+      --c-num: #b5cea8;
+      --c-lang: #569cd6;
+      --c-esc: #d7ba7d;
+      --c-inv: #f44747;
+      --c-kwc: #c586c0;
+      --c-kwop: #d4d4d4;
+      --c-kw: #569cd6;
+      --c-fn: #dcdcaa;
+      --c-typ: #4ec9b0;
+      --c-var: #9cdcfe;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f3f4f2;
+    --panel: #ffffff;
+    --border: #e0e2dd;
+    --ink: #23282b;
+    --muted: #67707a;
+    --accent: #8a6d1f;
+    --c-d: #1f2328;
+    --c-cm: #008000;
+    --c-str: #a31515;
+    --c-num: #098658;
+    --c-lang: #0000ff;
+    --c-esc: #ee0000;
+    --c-inv: #cd3131;
+    --c-kwc: #af00db;
+    --c-kwop: #24292e;
+    --c-kw: #0000ff;
+    --c-fn: #795e26;
+    --c-typ: #267f99;
+    --c-var: #001080;
+  }
+  :root[data-theme="dark"] {
+    --bg: #14171a;
+    --panel: #1e1e1e;
+    --border: #2a2e33;
+    --ink: #d9dee3;
+    --muted: #8a939e;
+    --accent: #d4a843;
+    --c-d: #d4d4d4;
+    --c-cm: #6a9955;
+    --c-str: #ce9178;
+    --c-num: #b5cea8;
+    --c-lang: #569cd6;
+    --c-esc: #d7ba7d;
+    --c-inv: #f44747;
+    --c-kwc: #c586c0;
+    --c-kwop: #d4d4d4;
+    --c-kw: #569cd6;
+    --c-fn: #dcdcaa;
+    --c-typ: #4ec9b0;
+    --c-var: #9cdcfe;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 26px 24px 40px; }
+
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; margin-bottom: 6px; }
+  header h1 {
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+    font-size: 1.2rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  #status { font-size: 0.78rem; color: var(--muted); }
+  #status.err { color: var(--c-inv); }
+
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0; }
+  .btn, .filebtn {
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .btn[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+  .btn:focus-visible, .filebtn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .filebtn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .filebtn { position: relative; display: inline-block; }
+  .spacer { margin-left: auto; }
+  #grammarpick { display: none; }
+  #grammarpick.show { display: inline-block; border-color: var(--c-inv); }
+
+  .editor {
+    display: flex;
+    height: min(72vh, 640px);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px 8px 0 0;
+    overflow: hidden;
+  }
+  .editor.dragover { outline: 2px dashed var(--accent); outline-offset: -6px; }
+  .mono {
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    tab-size: 4;
+  }
+  .gutter {
+    flex: none;
+    padding: 12px 14px 12px 10px;
+    text-align: right;
+    color: var(--muted);
+    opacity: 0.65;
+    user-select: none;
+    overflow: hidden;
+    font-variant-numeric: tabular-nums;
+    border-right: 1px solid var(--border);
+    white-space: pre;
+  }
+  .body { position: relative; flex: 1; }
+  .body > pre, .body > textarea {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 12px 16px;
+    white-space: pre;
+    overflow: auto;
+  }
+  .body > pre { color: var(--c-d); pointer-events: none; overflow: hidden; }
+  .body > textarea {
+    border: 0;
+    outline: none;
+    resize: none;
+    background: transparent;
+    color: transparent;
+    caret-color: var(--ink);
+  }
+  .editor.inspect .body > textarea { visibility: hidden; }
+  .editor.inspect .body > pre { pointer-events: auto; overflow: auto; }
+  .editor.inspect .body > pre span:hover { outline: 1px solid var(--accent); border-radius: 2px; }
+  .editor.inspect .body > pre span.pin { outline: 1.5px solid var(--accent); border-radius: 2px; }
+
+  .cm   { color: var(--c-cm); }
+  .str  { color: var(--c-str); }
+  .num  { color: var(--c-num); }
+  .lang { color: var(--c-lang); }
+  .esc  { color: var(--c-esc); }
+  .kwc  { color: var(--c-kwc); }
+  .kwop { color: var(--c-kwop); }
+  .kw   { color: var(--c-kw); }
+  .fn   { color: var(--c-fn); }
+  .typ  { color: var(--c-typ); }
+  .var  { color: var(--c-var); }
+  .d    { color: var(--c-d); }
+  .inv  {
+    color: var(--c-inv);
+    text-decoration: underline wavy;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  .inspector {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-top: 0;
+    border-radius: 0 0 8px 8px;
+    padding: 9px 16px;
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.76rem;
+    display: flex;
+    gap: 14px;
+    align-items: baseline;
+    min-height: 2.2em;
+  }
+  .inspector .tok { font-weight: 650; flex: none; }
+  .inspector .scopes { color: var(--muted); overflow-wrap: anywhere; }
+  .inspector .scopes b { color: var(--ink); font-weight: 600; }
+  .inspector .hint { color: var(--muted); font-style: italic; }
+
+  footer { margin-top: 14px; font-size: 0.76rem; color: var(--muted); }
+  footer code { font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>JASS syntax highlighter</h1>
+    <span id="status">loading engine…</span>
+  </header>
+
+  <div class="toolbar">
+    <label class="filebtn">Open file…<input type="file" id="filepick" accept=".j,.ai,.jass,.txt"></label>
+    <button class="btn" id="modebtn" aria-pressed="false" title="Freeze the text and hover tokens to inspect their scopes">Inspect</button>
+    <label class="filebtn" id="grammarpick">load grammar…<input type="file" id="grammarfile" accept=".json,.tmLanguage.json"></label>
+    <span class="spacer"></span>
+    <button class="btn" id="themebtn" title="Cycle colour theme">theme: auto</button>
+  </div>
+
+  <div class="editor" id="editor">
+    <div class="gutter mono" id="gutter" aria-hidden="true"></div>
+    <div class="body">
+      <pre class="mono" id="hl" aria-hidden="true"></pre>
+      <textarea class="mono" id="src" wrap="off" spellcheck="false" autocapitalize="off" autocomplete="off"
+        aria-label="JASS source"></textarea>
+    </div>
+  </div>
+  <div class="inspector" id="inspector"><span class="hint"></span></div>
+
+  <footer>
+    Tokenised in-browser by <code>vscode-textmate</code> + <code>vscode-oniguruma</code> — the engine
+    VS&nbsp;Code uses — against <code>syntaxes/jass.tmLanguage.json</code>.
+    Drop a file anywhere on the editor to load it.
+  </footer>
+</div>
+
+<noscript>This syntax highlighter needs JavaScript to tokenise the source.</noscript>
+
+<script>
+(function () {
+  "use strict";
+
+  var WASM_URL = "https://cdn.jsdelivr.net/npm/vscode-oniguruma@2.0.1/release/onig.wasm";
+  var GRAMMAR_URL = "syntaxes/jass.tmLanguage.json";
+
+  var SAMPLE = [
+    "// JASS syntax highlighter sample - type, paste, or drop a file",
+    "type unit extends handle",
+    "",
+    "globals",
+    "    constant integer HERO_ID = 'Hpal'",
+    "    constant integer BAD_OCTAL = 078",
+    "    constant string GREETING = \"hi\\n bad: \\q\"",
+    "    unit hero = null",
+    "endglobals",
+    "",
+    "function main takes integer count, real x returns nothing",
+    "    local integer i = 0",
+    "    loop",
+    "        exitwhen i > count",
+    "        set i = i + 1",
+    "        debug call BJDebugMsg(\"tick\")",
+    "    endloop",
+    "    set x = '™a' - '™' + 0then + abc0then",
+    "endfunction",
+    ""
+  ].join("\n");
+
+  // Longest-prefix scope -> colour-class table (Dark+/Light+ conventions).
+  var RULES = [
+    ["constant.character.escape", "esc"],
+    ["constant.character", "num"],
+    ["constant.numeric", "num"],
+    ["constant.language", "lang"],
+    ["comment", "cm"],
+    ["string", "str"],
+    ["invalid", "inv"],
+    ["keyword.control", "kwc"],
+    ["keyword.operator.logical", "kw"],
+    ["keyword.operator", "kwop"],
+    ["keyword", "kw"],
+    ["storage", "kw"],
+    ["entity.name.function", "fn"],
+    ["entity.name.type", "typ"],
+    ["variable.parameter", "var"],
+    ["variable", "var"]
+  ];
+
+  function classify(scopes) {
+    for (var i = scopes.length - 1; i >= 0; i--) {
+      var best = null;
+      for (var r = 0; r < RULES.length; r++) {
+        var p = RULES[r][0];
+        if (scopes[i] === p || scopes[i].indexOf(p + ".") === 0) {
+          if (!best || p.length > best[0].length) best = RULES[r];
+        }
+      }
+      if (best) return best[1];
+    }
+    return "d";
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  var statusEl = document.getElementById("status");
+  var editorEl = document.getElementById("editor");
+  var gutterEl = document.getElementById("gutter");
+  var hlEl = document.getElementById("hl");
+  var srcEl = document.getElementById("src");
+  var inspectorEl = document.getElementById("inspector");
+  var modeBtn = document.getElementById("modebtn");
+  var themeBtn = document.getElementById("themebtn");
+  var grammarPick = document.getElementById("grammarpick");
+
+  var grammar = null;
+  // One entry per line: { text, tokens: [[text, scopes[]]...], endStack, div }.
+  // The incoming stack of line l is the endStack of line l-1 (INITIAL for line 0);
+  // that invariant is what makes incremental retokenisation possible.
+  var lineCache = [];
+  var pinned = null;
+  var inspecting = false;
+
+  function setStatus(text, isError) {
+    statusEl.textContent = text;
+    statusEl.className = isError ? "err" : "";
+  }
+
+  // --- engine -----------------------------------------------------------
+
+  var onigLib = fetch(WASM_URL)
+    .then(function (r) { if (!r.ok) throw new Error("wasm " + r.status); return r.arrayBuffer(); })
+    .then(function (buf) { return onig.loadWASM(buf); })
+    .then(function () {
+      return {
+        createOnigScanner: function (p) { return new onig.OnigScanner(p); },
+        createOnigString: function (s) { return new onig.OnigString(s); }
+      };
+    });
+
+  function useGrammarSource(text, label) {
+    var raw;
+    try {
+      raw = vscodetextmate.parseRawGrammar(text, "jass.tmLanguage.json");
+    } catch (e) {
+      setStatus("grammar parse error: " + e.message, true);
+      return;
+    }
+    var registry = new vscodetextmate.Registry({
+      onigLib: onigLib,
+      loadGrammar: function (scope) {
+        return Promise.resolve(scope === "source.jass" ? raw : null);
+      }
+    });
+    registry.loadGrammar("source.jass").then(function (g) {
+      grammar = g;
+      grammarPick.classList.remove("show");
+      setStatus("grammar: " + label);
+      retokenizeAll();
+    }, function (e) {
+      setStatus("grammar load error: " + e.message, true);
+    });
+  }
+
+  fetch(GRAMMAR_URL)
+    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
+    .then(function (t) { useGrammarSource(t, GRAMMAR_URL); })
+    .catch(function () {
+      grammarPick.classList.add("show");
+      setStatus("could not fetch " + GRAMMAR_URL + " - serve the repo root (e.g. python3 -m http.server) or load the grammar manually", true);
+    });
+
+  // --- tokenise + render ------------------------------------------------
+
+  function makeEntry(text, stack) {
+    var res = grammar.tokenizeLine(text, stack);
+    var toks = [];
+    var html = [];
+    for (var t = 0; t < res.tokens.length; t++) {
+      var tok = res.tokens[t];
+      var seg = text.substring(tok.startIndex, tok.endIndex);
+      if (seg === "") continue;
+      var scopes = tok.scopes.filter(function (s) { return s !== "source.jass"; });
+      toks.push([seg, scopes]);
+      html.push('<span class="' + classify(scopes) + '">' + escapeHtml(seg) + "</span>");
+    }
+    var div = document.createElement("div");
+    div.innerHTML = html.length ? html.join("") : "<br>";
+    return { text: text, tokens: toks, endStack: res.ruleStack, div: div };
+  }
+
+  function stacksEqual(a, b) {
+    return a === b || (!!a && !!b && typeof a.equals === "function" && a.equals(b));
+  }
+
+  function updateGutter(count) {
+    var nums = new Array(count);
+    for (var i = 0; i < count; i++) nums[i] = i + 1;
+    gutterEl.textContent = nums.join("\n");
+    gutterEl.style.minWidth = (String(count).length + 1) + "ch";
+  }
+
+  function retokenizeAll() {
+    if (!grammar) return;
+    var lines = srcEl.value.split(/\r?\n/);
+    var stack = vscodetextmate.INITIAL;
+    var frag = document.createDocumentFragment();
+    lineCache = [];
+    for (var l = 0; l < lines.length; l++) {
+      var e = makeEntry(lines[l], stack);
+      stack = e.endStack;
+      lineCache.push(e);
+      frag.appendChild(e.div);
+    }
+    hlEl.textContent = "";
+    hlEl.appendChild(frag);
+    updateGutter(lines.length);
+    pinned = null;
+    updateInspector(null);
+    syncScroll();
+  }
+
+  // Retokenise only what an edit can have affected: the changed line range, then
+  // onward until the rule stack converges with the cached incoming stack of the
+  // corresponding old line. Runs synchronously on every input event, so the
+  // visible (highlighted) text never lags the keystroke.
+  function retokenizeIncremental() {
+    if (!grammar) { return; }
+    var newLines = srcEl.value.split(/\r?\n/);
+    var old = lineCache;
+    var oldLen = old.length;
+    var newLen = newLines.length;
+
+    var p = 0;
+    while (p < oldLen && p < newLen && old[p].text === newLines[p]) p++;
+    var s = 0;
+    while (s < oldLen - p && s < newLen - p && old[oldLen - 1 - s].text === newLines[newLen - 1 - s]) s++;
+
+    if (p === newLen && oldLen === newLen) return;
+
+    var stack = p > 0 ? old[p - 1].endStack : vscodetextmate.INITIAL;
+    var newCache = old.slice(0, p);
+    var frag = document.createDocumentFragment();
+    var shift = newLen - oldLen;
+    var i = p;
+
+    for (; i < newLen - s; i++) {
+      var e = makeEntry(newLines[i], stack);
+      stack = e.endStack;
+      newCache.push(e);
+      frag.appendChild(e.div);
+    }
+    while (i < newLen) {
+      var oldIncoming = (i - shift) > 0 ? old[i - shift - 1].endStack : vscodetextmate.INITIAL;
+      if (stacksEqual(stack, oldIncoming)) break;
+      var e2 = makeEntry(newLines[i], stack);
+      stack = e2.endStack;
+      newCache.push(e2);
+      frag.appendChild(e2.div);
+      i++;
+    }
+
+    var keepFrom = i - shift;
+    for (var k = p; k < keepFrom && k < oldLen; k++) hlEl.removeChild(old[k].div);
+    hlEl.insertBefore(frag, keepFrom < oldLen ? old[keepFrom].div : null);
+    for (; i < newLen; i++) newCache.push(old[i - shift]);
+    lineCache = newCache;
+
+    if (newLen !== oldLen) updateGutter(newLen);
+    syncScroll();
+  }
+
+  srcEl.addEventListener("input", retokenizeIncremental);
+
+  function syncScroll() {
+    var sc = inspecting ? hlEl : srcEl;
+    if (!inspecting) {
+      hlEl.scrollTop = sc.scrollTop;
+      hlEl.scrollLeft = sc.scrollLeft;
+    }
+    gutterEl.scrollTop = sc.scrollTop;
+  }
+  srcEl.addEventListener("scroll", syncScroll);
+  hlEl.addEventListener("scroll", syncScroll);
+
+  // --- inspect mode -----------------------------------------------------
+
+  function tokenAt(span) {
+    var div = span.parentNode;
+    if (!div || div.parentNode !== hlEl) return null;
+    var l = Array.prototype.indexOf.call(hlEl.children, div);
+    var i = Array.prototype.indexOf.call(div.children, span);
+    if (l < 0 || i < 0 || !lineCache[l] || !lineCache[l].tokens[i]) return null;
+    return lineCache[l].tokens[i];
+  }
+
+  function updateInspector(span) {
+    if (!inspecting) {
+      inspectorEl.innerHTML = '<span class="hint">Switch to Inspect and hover a token to see its scopes</span>';
+      return;
+    }
+    var entry = span && tokenAt(span);
+    if (!entry) {
+      inspectorEl.innerHTML = '<span class="hint">Hover a token to inspect its scopes; click to pin</span>';
+      return;
+    }
+    var parts = entry[1];
+    var shown = parts.length
+      ? parts.map(function (sc, i) { return i === parts.length - 1 ? "<b>" + escapeHtml(sc) + "</b>" : escapeHtml(sc); }).join(" › ")
+      : "<i>no scope (default colour)</i>";
+    inspectorEl.innerHTML =
+      '<span class="tok">' + escapeHtml(JSON.stringify(entry[0])) + "</span>" +
+      '<span class="scopes">source.jass › ' + shown + "</span>";
+  }
+
+  modeBtn.addEventListener("click", function () {
+    inspecting = !inspecting;
+    modeBtn.setAttribute("aria-pressed", String(inspecting));
+    editorEl.classList.toggle("inspect", inspecting);
+    if (inspecting) {
+      hlEl.scrollTop = srcEl.scrollTop;
+      hlEl.scrollLeft = srcEl.scrollLeft;
+    } else {
+      srcEl.scrollTop = hlEl.scrollTop;
+      srcEl.scrollLeft = hlEl.scrollLeft;
+      srcEl.focus();
+    }
+    pinned = null;
+    updateInspector(null);
+  });
+
+  hlEl.addEventListener("mouseover", function (e) {
+    var sp = e.target.closest ? e.target.closest("span") : null;
+    if (sp && !pinned) updateInspector(sp);
+  });
+  hlEl.addEventListener("mouseleave", function () { if (!pinned) updateInspector(null); });
+  hlEl.addEventListener("click", function (e) {
+    if (!inspecting) return;
+    var sp = e.target.closest ? e.target.closest("span") : null;
+    var prev = hlEl.querySelector(".pin");
+    if (prev) prev.classList.remove("pin");
+    if (sp && pinned !== sp) {
+      pinned = sp;
+      sp.classList.add("pin");
+      updateInspector(sp);
+    } else {
+      pinned = null;
+      updateInspector(null);
+    }
+  });
+
+  // --- file loading -----------------------------------------------------
+
+  function readFileInto(file, cb) {
+    var reader = new FileReader();
+    reader.onload = function () { cb(String(reader.result)); };
+    reader.readAsText(file);
+  }
+
+  document.getElementById("filepick").addEventListener("change", function (e) {
+    if (e.target.files[0]) {
+      readFileInto(e.target.files[0], function (text) {
+        srcEl.value = text;
+        retokenizeAll();
+      });
+    }
+  });
+
+  document.getElementById("grammarfile").addEventListener("change", function (e) {
+    if (e.target.files[0]) {
+      var name = e.target.files[0].name;
+      readFileInto(e.target.files[0], function (text) { useGrammarSource(text, name); });
+    }
+  });
+
+  editorEl.addEventListener("dragover", function (e) { e.preventDefault(); editorEl.classList.add("dragover"); });
+  editorEl.addEventListener("dragleave", function () { editorEl.classList.remove("dragover"); });
+  editorEl.addEventListener("drop", function (e) {
+    e.preventDefault();
+    editorEl.classList.remove("dragover");
+    var file = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) {
+      readFileInto(file, function (text) {
+        srcEl.value = text;
+        retokenizeAll();
+      });
+    }
+  });
+
+  // --- theme ------------------------------------------------------------
+
+  var THEMES = ["auto", "light", "dark"];
+  function applyTheme(t) {
+    if (t === "auto") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", t);
+    themeBtn.textContent = "theme: " + t;
+    try { localStorage.setItem("jass-syntax-highlighter-theme", t); } catch (e) { /* private mode */ }
+  }
+  var savedTheme = null;
+  try { savedTheme = localStorage.getItem("jass-syntax-highlighter-theme"); } catch (e) { /* private mode */ }
+  applyTheme(THEMES.indexOf(savedTheme) >= 0 ? savedTheme : "auto");
+  themeBtn.addEventListener("click", function () {
+    var cur = document.documentElement.getAttribute("data-theme") || "auto";
+    applyTheme(THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length]);
+  });
+
+  // --- init -------------------------------------------------------------
+
+  srcEl.value = SAMPLE;
+  updateInspector(null);
+})();
+</script>
+</body>
+</html>

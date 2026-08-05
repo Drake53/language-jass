@@ -1,0 +1,50 @@
+name: Deploy syntax highlighter to GitHub Pages
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - syntax-highlighter.html
+      - syntaxes/jass.tmLanguage.json
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; never cancel one that is already running.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      # Fails early with a clear message if Pages is not enabled for the repository.
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      # The page fetches the grammar at a relative path, so the site mirrors the repo layout.
+      - name: Assemble site
+        run: |
+          mkdir -p _site/syntaxes
+          cp syntax-highlighter.html _site/index.html
+          cp syntaxes/jass.tmLanguage.json _site/syntaxes/
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+      - name: Deploy to Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
