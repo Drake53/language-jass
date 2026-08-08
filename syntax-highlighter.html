@@ -18,95 +18,73 @@
   Highlighting updates synchronously per keystroke: only the lines from the first
   edit onward are retokenised, and tokenisation stops as soon as the TextMate rule
   stack converges with the cached stack of the following line.
+
+  The theme toggle picks the token colours, VS Code (Light+/Dark+) or
+  GitHub (Primer prettylights); mode cycles auto/light/dark independently.
 -->
 <script src="https://cdn.jsdelivr.net/npm/vscode-oniguruma@2.0.1/release/main.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/vscode-textmate@9.3.2/release/main.js"></script>
 <style>
+  /* Every colour token is a single light-dark() pair, resolved against the
+     root's colour scheme: "light dark" follows the OS preference, and the
+     mode button forces a side by pinning colour-scheme via data-theme. */
   :root {
-    --bg: #f3f4f2;
-    --panel: #ffffff;
-    --border: #e0e2dd;
-    --ink: #23282b;
-    --muted: #67707a;
-    --accent: #8a6d1f;
-    --c-d: #1f2328;
-    --c-cm: #008000;
-    --c-str: #a31515;
-    --c-num: #098658;
-    --c-lang: #0000ff;
-    --c-esc: #ee0000;
-    --c-inv: #cd3131;
-    --c-kwc: #af00db;
-    --c-kwop: #24292e;
-    --c-kw: #0000ff;
-    --c-fn: #795e26;
-    --c-typ: #267f99;
-    --c-var: #001080;
+    color-scheme: light dark;
+    --bg: light-dark(#f3f4f2, #14171a);
+    --panel: light-dark(#ffffff, #1e1e1e);
+    --border: light-dark(#e0e2dd, #2a2e33);
+    --ink: light-dark(#23282b, #d9dee3);
+    --muted: light-dark(#67707a, #8a939e);
+    --accent: light-dark(#8a6d1f, #d4a843);
+    --c-d: light-dark(#1f2328, #d4d4d4);
+    --c-cm: light-dark(#008000, #6a9955);
+    --c-str: light-dark(#a31515, #ce9178);
+    --c-num: light-dark(#098658, #b5cea8);
+    --c-lang: light-dark(#0000ff, #569cd6);
+    --c-esc: light-dark(#ee0000, #d7ba7d);
+    --c-inv: light-dark(#cd3131, #f44747);
+    --c-kwc: light-dark(#af00db, #c586c0);
+    --c-kwop: light-dark(#24292e, #d4d4d4);
+    --c-kw: light-dark(#0000ff, #569cd6);
+    --c-fn: light-dark(#795e26, #dcdcaa);
+    --c-fnv: light-dark(#795e26, #dcdcaa);
+    --c-typ: light-dark(#267f99, #4ec9b0);
+    --c-sup: light-dark(#267f99, #4ec9b0);
+    --c-var: light-dark(#001080, #9cdcfe);
+    --c-varo: light-dark(#001080, #9cdcfe);
+    --c-varc: light-dark(#0070c1, #4fc1ff);
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #14171a;
-      --panel: #1e1e1e;
-      --border: #2a2e33;
-      --ink: #d9dee3;
-      --muted: #8a939e;
-      --accent: #d4a843;
-      --c-d: #d4d4d4;
-      --c-cm: #6a9955;
-      --c-str: #ce9178;
-      --c-num: #b5cea8;
-      --c-lang: #569cd6;
-      --c-esc: #d7ba7d;
-      --c-inv: #f44747;
-      --c-kwc: #c586c0;
-      --c-kwop: #d4d4d4;
-      --c-kw: #569cd6;
-      --c-fn: #dcdcaa;
-      --c-typ: #4ec9b0;
-      --c-var: #9cdcfe;
-    }
-  }
-  :root[data-theme="light"] {
-    --bg: #f3f4f2;
-    --panel: #ffffff;
-    --border: #e0e2dd;
-    --ink: #23282b;
-    --muted: #67707a;
-    --accent: #8a6d1f;
-    --c-d: #1f2328;
-    --c-cm: #008000;
-    --c-str: #a31515;
-    --c-num: #098658;
-    --c-lang: #0000ff;
-    --c-esc: #ee0000;
-    --c-inv: #cd3131;
-    --c-kwc: #af00db;
-    --c-kwop: #24292e;
-    --c-kw: #0000ff;
-    --c-fn: #795e26;
-    --c-typ: #267f99;
-    --c-var: #001080;
-  }
-  :root[data-theme="dark"] {
-    --bg: #14171a;
-    --panel: #1e1e1e;
-    --border: #2a2e33;
-    --ink: #d9dee3;
-    --muted: #8a939e;
-    --accent: #d4a843;
-    --c-d: #d4d4d4;
-    --c-cm: #6a9955;
-    --c-str: #ce9178;
-    --c-num: #b5cea8;
-    --c-lang: #569cd6;
-    --c-esc: #d7ba7d;
-    --c-inv: #f44747;
-    --c-kwc: #c586c0;
-    --c-kwop: #d4d4d4;
-    --c-kw: #569cd6;
-    --c-fn: #dcdcaa;
-    --c-typ: #4ec9b0;
-    --c-var: #9cdcfe;
+  :root[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="dark"] { color-scheme: dark; }
+
+  /* GitHub theme: Primer prettylights colours, applied per github.com's TextMate
+     scope -> pl-* class map (extracted in wooorm/starry-night lib/theme.js):
+     keywords, storage, and operators share pl-k red; entity names (types and
+     functions) are pl-en purple; support.* and constants share pl-c1 blue;
+     variable.other is pl-smi (near-default) while bare variable/parameter are
+     pl-v orange and variable.other.constant is constant blue; string escapes
+     have no own colour and inherit the string's. */
+  :root[data-palette="github"] {
+    --panel: light-dark(#ffffff, #0d1117);
+    --border: light-dark(#d1d9e0, #3d444d);
+    --c-d: light-dark(#1f2328, #f0f6fc);
+    --c-cm: light-dark(#59636e, #9198a1);
+    --c-str: light-dark(#0a3069, #a5d6ff);
+    --c-num: light-dark(#0550ae, #79c0ff);
+    --c-lang: light-dark(#0550ae, #79c0ff);
+    --c-esc: light-dark(#0a3069, #a5d6ff);
+    --c-inv: light-dark(#d1242f, #f85149);
+    --c-inv-bg: light-dark(#ffebe9, rgba(248, 81, 73, 0.1));
+    --c-kwc: light-dark(#cf222e, #ff7b72);
+    --c-kwop: light-dark(#cf222e, #ff7b72);
+    --c-kw: light-dark(#cf222e, #ff7b72);
+    --c-fn: light-dark(#6639ba, #d2a8ff);
+    --c-fnv: light-dark(#953800, #ffa657);
+    --c-typ: light-dark(#6639ba, #d2a8ff);
+    --c-sup: light-dark(#0550ae, #79c0ff);
+    --c-var: light-dark(#953800, #ffa657);
+    --c-varo: light-dark(#1f2328, #f0f6fc);
+    --c-varc: light-dark(#0550ae, #79c0ff);
   }
 
   * { box-sizing: border-box; }
@@ -131,15 +109,24 @@
 
   .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0; }
   .btn, .filebtn {
-    font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
-    font-size: 0.78rem;
-    padding: 5px 10px;
+    padding: 6px;
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--panel);
     color: var(--ink);
     cursor: pointer;
   }
+  .btn svg, .filebtn svg { display: block; width: 16px; height: 16px; }
+  /* The mode button holds one icon per state; the root's data-theme
+     attribute decides which one is visible. */
+  #schemebtn .i-light, #schemebtn .i-dark { display: none; }
+  :root[data-theme] #schemebtn .i-auto { display: none; }
+  :root[data-theme="light"] #schemebtn .i-light { display: block; }
+  :root[data-theme="dark"] #schemebtn .i-dark { display: block; }
+  .seg { display: inline-flex; }
+  .seg .btn:first-child { border-radius: 6px 0 0 6px; }
+  .seg .btn + .btn { border-radius: 0 6px 6px 0; margin-left: -1px; }
+  .seg .btn[aria-pressed="true"] { position: relative; z-index: 1; }
   .btn[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
   .btn:focus-visible, .filebtn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
   .filebtn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
@@ -195,6 +182,10 @@
     color: transparent;
     caret-color: var(--ink);
   }
+  /* Until a grammar has painted the pre overlay, the textarea shows its own
+     text, and Inspect is hidden since there are no tokens to inspect. */
+  body.nogrammar .body > textarea { color: var(--c-d); }
+  body.nogrammar #modebtn { display: none; }
   .editor.inspect .body > textarea { visibility: hidden; }
   .editor.inspect .body > pre { pointer-events: auto; overflow: auto; }
   .editor.inspect .body > pre span:hover { outline: 1px solid var(--accent); border-radius: 2px; }
@@ -209,15 +200,24 @@
   .kwop { color: var(--c-kwop); }
   .kw   { color: var(--c-kw); }
   .fn   { color: var(--c-fn); }
+  .fnv  { color: var(--c-fnv); }
   .typ  { color: var(--c-typ); }
+  .sup  { color: var(--c-sup); }
   .var  { color: var(--c-var); }
+  .varo { color: var(--c-varo); }
+  .varc { color: var(--c-varc); }
   .d    { color: var(--c-d); }
   .inv  {
     color: var(--c-inv);
+    background: var(--c-inv-bg, transparent);
+    border-radius: 2px;
     text-decoration: underline wavy;
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;
   }
+  /* github.com renders invalid.illegal as danger-on-danger-background (pl-ii),
+     without VS Code's squiggle. */
+  :root[data-palette="github"] .inv { text-decoration: none; }
 
   .inspector {
     background: var(--panel);
@@ -241,7 +241,7 @@
   footer code, footer kbd { font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace; }
 </style>
 </head>
-<body>
+<body class="nogrammar">
 <div class="wrap">
   <header>
     <h1>JASS syntax highlighter</h1>
@@ -249,11 +249,31 @@
   </header>
 
   <div class="toolbar">
-    <label class="filebtn">Open file…<input type="file" id="filepick" accept=".j,.ai,.jass,.txt"></label>
-    <button class="btn" id="modebtn" aria-pressed="false" title="Freeze the text and hover tokens to inspect their scopes">Inspect</button>
-    <label class="filebtn" id="grammarpick">load grammar…<input type="file" id="grammarfile" accept=".json,.tmLanguage.json"></label>
+    <label class="filebtn" title="Open file">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      <input type="file" id="filepick" accept=".j,.ai,.jass,.txt" aria-label="Open file">
+    </label>
+    <button class="btn" id="modebtn" aria-pressed="false" aria-label="Inspect" title="Freeze the text and hover tokens to inspect their scopes">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    </button>
+    <label class="filebtn" id="grammarpick" title="Load grammar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="M9 15h6"/></svg>
+      <input type="file" id="grammarfile" accept=".json,.tmLanguage.json" aria-label="Load grammar">
+    </label>
     <span class="spacer"></span>
-    <button class="btn" id="themebtn" title="Cycle colour theme">theme: auto</button>
+    <div class="seg" role="group" aria-label="Token colour theme">
+      <button class="btn" id="themevscode" aria-pressed="false" aria-label="VS Code token colours" title="VS Code token colours">
+        <svg viewBox="0 0 100 100" fill="currentColor" aria-hidden="true"><path d="M96.5 10.7 76 .8a6.2 6.2 0 0 0-7 1.2L29.9 37.7 12.7 24.6a4.1 4.1 0 0 0-5.3.2L1.9 29.9a4.2 4.2 0 0 0 0 6.1L16.8 50 1.9 63.9a4.2 4.2 0 0 0 0 6.2l5.5 5a4.1 4.1 0 0 0 5.3.3l17.2-13.2L69 97.9a6.2 6.2 0 0 0 7 1.2l20.5-9.8a6.2 6.2 0 0 0 3.5-5.6V16.3a6.2 6.2 0 0 0-3.5-5.6ZM75 72.3 45.3 50 75 27.7Z"/></svg>
+      </button>
+      <button class="btn" id="themegithub" aria-pressed="false" aria-label="GitHub token colours" title="GitHub token colours">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+      </button>
+    </div>
+    <button class="btn" id="schemebtn" title="Cycle light/dark mode">
+      <svg class="i-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18Z" fill="currentColor" stroke="none"/></svg>
+      <svg class="i-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      <svg class="i-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
   </div>
 
   <div class="editor" id="editor">
@@ -269,6 +289,7 @@
   <footer>
     Tokenised in-browser by <code>vscode-textmate</code> + <code>vscode-oniguruma</code> — the engine
     VS&nbsp;Code uses — against <code>syntaxes/jass.tmLanguage.json</code>.
+    The theme toggle previews VS&nbsp;Code (Light+/Dark+) or GitHub (prettylights) colours.
     Drop a file anywhere on the editor to load it.
     <kbd>Tab</kbd>/<kbd>Shift</kbd>+<kbd>Tab</kbd> indent, <kbd>Esc</kbd> leaves the editor.
   </footer>
@@ -306,7 +327,9 @@
     ""
   ].join("\n");
 
-  // Longest-prefix scope -> colour-class table (Dark+/Light+ conventions).
+  // Longest-prefix scope -> colour-class table. Classes are palette-neutral;
+  // the active theme (VS Code Light+/Dark+ or GitHub prettylights) supplies
+  // the actual colours via the --c-* CSS variables.
   var RULES = [
     ["constant.character.escape", "esc"],
     ["constant.character", "num"],
@@ -323,8 +346,10 @@
     ["entity.name.function", "fn"],
     ["entity.name.type", "typ"],
     ["entity.other.inherited-class", "typ"],
-    ["support.type", "typ"],
-    ["variable.function", "fn"],
+    ["support.type", "sup"],
+    ["variable.function", "fnv"],
+    ["variable.other.constant", "varc"],
+    ["variable.other", "varo"],
     ["variable.parameter", "var"],
     ["variable", "var"]
   ];
@@ -354,7 +379,9 @@
   var srcEl = document.getElementById("src");
   var inspectorEl = document.getElementById("inspector");
   var modeBtn = document.getElementById("modebtn");
-  var themeBtn = document.getElementById("themebtn");
+  var themeVsBtn = document.getElementById("themevscode");
+  var themeGhBtn = document.getElementById("themegithub");
+  var schemeBtn = document.getElementById("schemebtn");
   var grammarPick = document.getElementById("grammarpick");
 
   var grammar = null;
@@ -399,6 +426,7 @@
     registry.loadGrammar("source.jass").then(function (g) {
       grammar = g;
       grammarPick.classList.remove("show");
+      document.body.classList.remove("nogrammar");
       setStatus("grammar: " + label);
       retokenizeAll();
     }, function (e) {
@@ -445,7 +473,7 @@
   }
 
   function retokenizeAll() {
-    if (!grammar) return;
+    if (!grammar) { updateGutter(srcEl.value.split(/\r?\n/).length); return; }
     var lines = srcEl.value.split(/\r?\n/);
     var stack = vscodetextmate.INITIAL;
     var frag = document.createDocumentFragment();
@@ -469,7 +497,7 @@
   // corresponding old line. Runs synchronously on every input event, so the
   // visible (highlighted) text never lags the keystroke.
   function retokenizeIncremental() {
-    if (!grammar) { return; }
+    if (!grammar) { updateGutter(srcEl.value.split(/\r?\n/).length); return; }
     var newLines = srcEl.value.split(/\r?\n/);
     var old = lineCache;
     var oldLen = old.length;
@@ -598,7 +626,9 @@
 
   function updateInspector(span) {
     if (!inspecting) {
-      inspectorEl.innerHTML = '<span class="hint">Switch to Inspect and hover a token to see its scopes</span>';
+      inspectorEl.innerHTML = grammar
+        ? '<span class="hint">Switch to Inspect and hover a token to see its scopes</span>'
+        : '<span class="hint"></span>';
       return;
     }
     var entry = span && tokenAt(span);
@@ -691,24 +721,40 @@
 
   // --- theme ------------------------------------------------------------
 
-  var THEMES = ["auto", "light", "dark"];
+  var MODES = ["auto", "light", "dark"];
+  function applyMode(m) {
+    if (m === "auto") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", m);
+    schemeBtn.title = "mode: " + m + " - click to cycle light/dark";
+    schemeBtn.setAttribute("aria-label", "mode: " + m);
+    try { localStorage.setItem("jass-syntax-highlighter-theme", m); } catch (e) { /* private mode */ }
+  }
+  var savedMode = null;
+  try { savedMode = localStorage.getItem("jass-syntax-highlighter-theme"); } catch (e) { /* private mode */ }
+  applyMode(MODES.indexOf(savedMode) >= 0 ? savedMode : "auto");
+  schemeBtn.addEventListener("click", function () {
+    var cur = document.documentElement.getAttribute("data-theme") || "auto";
+    applyMode(MODES[(MODES.indexOf(cur) + 1) % MODES.length]);
+  });
+
+  var THEMES = ["vscode", "github"];
   function applyTheme(t) {
-    if (t === "auto") document.documentElement.removeAttribute("data-theme");
-    else document.documentElement.setAttribute("data-theme", t);
-    themeBtn.textContent = "theme: " + t;
-    try { localStorage.setItem("jass-syntax-highlighter-theme", t); } catch (e) { /* private mode */ }
+    if (t === "vscode") document.documentElement.removeAttribute("data-palette");
+    else document.documentElement.setAttribute("data-palette", t);
+    themeVsBtn.setAttribute("aria-pressed", String(t === "vscode"));
+    themeGhBtn.setAttribute("aria-pressed", String(t === "github"));
+    try { localStorage.setItem("jass-syntax-highlighter-palette", t); } catch (e) { /* private mode */ }
   }
   var savedTheme = null;
-  try { savedTheme = localStorage.getItem("jass-syntax-highlighter-theme"); } catch (e) { /* private mode */ }
-  applyTheme(THEMES.indexOf(savedTheme) >= 0 ? savedTheme : "auto");
-  themeBtn.addEventListener("click", function () {
-    var cur = document.documentElement.getAttribute("data-theme") || "auto";
-    applyTheme(THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length]);
-  });
+  try { savedTheme = localStorage.getItem("jass-syntax-highlighter-palette"); } catch (e) { /* private mode */ }
+  applyTheme(THEMES.indexOf(savedTheme) >= 0 ? savedTheme : "vscode");
+  themeVsBtn.addEventListener("click", function () { applyTheme("vscode"); });
+  themeGhBtn.addEventListener("click", function () { applyTheme("github"); });
 
   // --- init -------------------------------------------------------------
 
   srcEl.value = SAMPLE;
+  retokenizeAll();
   updateInspector(null);
 })();
 </script>
