@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Live JASS syntax highlighter — tokenised in-browser by the VS Code TextMate engine against the language-jass grammar.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23d4a843'/><text x='50' y='74' font-family='monospace' font-size='66' font-weight='bold' text-anchor='middle' fill='%2314171a'>J</text></svg>">
 <title>JASS syntax highlighter</title>
 <!--
   Live syntax highlighter for the JASS TextMate grammar.
@@ -195,6 +197,8 @@
     color: var(--ink);
     cursor: pointer;
   }
+  .btn:hover, .filebtn:hover { background: color-mix(in srgb, var(--ink) 6%, var(--panel)); }
+  .btn:active, .filebtn:active { background: color-mix(in srgb, var(--ink) 11%, var(--panel)); }
   .btn svg, .filebtn svg { display: block; width: 16px; height: 16px; }
   /* The mode button holds one icon per state; the root's data-theme
      attribute decides which one is visible. */
@@ -208,6 +212,7 @@
   .seg .btn:last-child { border-radius: 0 6px 6px 0; }
   .seg .btn + .btn { margin-left: -1px; }
   .seg .btn[aria-pressed="true"] { position: relative; z-index: 1; }
+  .seg .btn:focus-visible { position: relative; z-index: 2; }
   .btn[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
   .btn:focus-visible, .filebtn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
   .filebtn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
@@ -216,7 +221,13 @@
   #grammarpick { display: none; }
   #grammarpick.show { display: inline-block; border-color: var(--c-inv); }
 
+  .card {
+    border-radius: 8px;
+    box-shadow: 0 1px 3px light-dark(rgba(35, 40, 43, 0.07), rgba(0, 0, 0, 0.35)),
+                0 6px 20px light-dark(rgba(35, 40, 43, 0.05), rgba(0, 0, 0, 0.2));
+  }
   .editor {
+    position: relative;
     display: flex;
     height: min(72vh, 640px);
     background: var(--panel);
@@ -224,7 +235,22 @@
     border-radius: 8px 8px 0 0;
     overflow: hidden;
   }
+  .editor:focus-within { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
   .editor.dragover { outline: 2px dashed var(--accent); outline-offset: -6px; }
+  /* pointer-events: none keeps drag events hitting the layers beneath, so the
+     overlay's appearance doesn't retarget them and flicker the dragover class. */
+  .editor.dragover::after {
+    content: "Drop file to load";
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-weight: 600;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--panel) 80%, transparent);
+    pointer-events: none;
+  }
+  .editor ::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
   .mono {
     font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
     font-size: 0.82rem;
@@ -253,6 +279,8 @@
     overflow: auto;
     /* Both layers are overlaid, so their tab stops have to line up. */
     tab-size: 4;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--muted) 45%, transparent) transparent;
   }
   .body > pre { color: var(--c-d); pointer-events: none; overflow: hidden; }
   .body > textarea {
@@ -339,15 +367,32 @@
   .inspector .scopes b { color: var(--ink); font-weight: 600; }
   .inspector .hint { color: var(--muted); font-style: italic; }
 
-  footer { margin-top: 14px; font-size: 0.76rem; color: var(--muted); }
+  footer { margin-top: 14px; font-size: 0.76rem; line-height: 1.8; color: var(--muted); }
   footer code, footer kbd { font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace; }
+  footer code {
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+    padding: 1px 4px;
+    border-radius: 4px;
+  }
+  footer kbd {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 0 4px;
+    font-size: 0.92em;
+  }
+
+  @media (max-width: 640px) {
+    .wrap { padding: 14px 12px 28px; }
+  }
 </style>
 </head>
 <body class="nogrammar">
 <div class="wrap">
   <header>
     <h1>JASS syntax highlighter</h1>
-    <span id="status">loading engine…</span>
+    <span id="status" aria-live="polite">loading engine…</span>
   </header>
 
   <div class="toolbar">
@@ -384,15 +429,17 @@
     </button>
   </div>
 
-  <div class="editor" id="editor">
-    <div class="gutter mono" id="gutter" aria-hidden="true"></div>
-    <div class="body">
-      <pre class="mono" id="hl" aria-hidden="true"></pre>
-      <textarea class="mono" id="src" wrap="off" spellcheck="false" autocapitalize="off" autocomplete="off"
-        aria-label="JASS source"></textarea>
+  <div class="card">
+    <div class="editor" id="editor">
+      <div class="gutter mono" id="gutter" aria-hidden="true"></div>
+      <div class="body">
+        <pre class="mono" id="hl" aria-hidden="true"></pre>
+        <textarea class="mono" id="src" wrap="off" spellcheck="false" autocapitalize="off" autocomplete="off"
+          aria-label="JASS source"></textarea>
+      </div>
     </div>
+    <div class="inspector" id="inspector"><span class="hint"></span></div>
   </div>
-  <div class="inspector" id="inspector"><span class="hint"></span></div>
 
   <footer>
     Tokenised in-browser by <code>vscode-textmate</code> + <code>vscode-oniguruma</code> — the engine
