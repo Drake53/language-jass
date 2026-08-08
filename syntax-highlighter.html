@@ -187,6 +187,7 @@
   }
   #status { font-size: 0.78rem; color: var(--muted); }
   #status.err { color: var(--c-inv); }
+  .nojs { font-size: 0.78rem; color: var(--c-inv); }
 
   .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0; }
   .btn, .filebtn {
@@ -392,7 +393,8 @@
 <div class="wrap">
   <header>
     <h1>JASS syntax highlighter</h1>
-    <span id="status" aria-live="polite">loading engine…</span>
+    <span id="status" aria-live="polite"></span>
+    <noscript><span class="nojs">This page requires JavaScript to work</span></noscript>
   </header>
 
   <div class="toolbar">
@@ -449,8 +451,6 @@
     <kbd>Tab</kbd>/<kbd>Shift</kbd>+<kbd>Tab</kbd> indent, <kbd>Esc</kbd> leaves the editor.
   </footer>
 </div>
-
-<noscript>This syntax highlighter needs JavaScript to tokenise the source.</noscript>
 
 <script>
 (function () {
@@ -563,6 +563,8 @@
   }
 
   // --- engine -----------------------------------------------------------
+
+  setStatus("loading engine…");
 
   var onigLib = fetch(WASM_URL)
     .then(function (r) { if (!r.ok) throw new Error("wasm " + r.status); return r.arrayBuffer(); })
