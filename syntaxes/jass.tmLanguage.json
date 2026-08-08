@@ -6,8 +6,10 @@
     "1. Keyword and number rules have NO leading word boundary. A numeric literal ends at the first character outside its digit set, so '0then' is '0' + keyword 'then' and '0xFthen' is '0xF' + 'then'. A leading \\b would break those.",
     "2. #identifier is load-bearing, not cosmetic. It always matches a full [A-Za-z_][0-9A-Za-z_]* run starting at its leftmost character, which is what keeps keyword/number rules from matching in the middle of one ('myif' or 'abc0then' stay single identifiers). It must stay after #keywords and #function-call, and before #illegal.",
     "3. Rules sharing a start character are ordered longest-token-first because the engine does NOT prefer the longest match: '==' before '=', hex before decimal, real before octal, bad-octal (contains 8/9) before octal, 'elseif' before 'else'.",
-    "Name/type slots in declarations use capture sub-patterns that try #keywords first and fall back to the entity/variable scope. This replaces per-rule keyword-exclusion lookaheads: when a keyword lands in a name slot it simply keeps its keyword colour, so malformed lines degrade to plain token highlighting instead of mis-scoping.",
-    "Strings and single-quoted literals are begin/end rules because they only terminate at the closing quote (or end of file), never at a newline.",
+    "Name/type slots in declarations use capture sub-patterns that try #keywords first and fall back to the slot's own scope. This replaces per-rule keyword-exclusion lookaheads for colouring: when a keyword lands in a name slot it simply keeps its keyword colour, so malformed lines degrade to plain token highlighting instead of mis-scoping. The two guards that do exist - the function name slot and the parameter name slot refusing 'takes'/'returns' - are structural, not cosmetic: they keep those keywords unconsumed so the meta.function clause regions can open and close at them.",
+    "The function signature follows the meta.function scope convention: meta.function (the head), meta.function.parameters (the takes-clause) and meta.function.return-type (the returns-clause) alternate instead of stacking. That is why the signature wrapper region has no name of its own - a named wrapper would stack over every clause - and why the clause regions close by lookahead before 'returns', a trailing comment, or the end of the line.",
+    "Scope naming follows https://www.sublimetext.com/docs/scope_naming.html. The decisions easiest to accidentally undo: entity.name.* appears ONLY at definition sites - entity.name.function in a function declaration's name slot, entity.name.type in a type declaration's - while invocations and 'function Foo' references are variable.function, type USAGES are support.type (outside the primitives, every type a script can name is declared by common.j, so a usage is a library reference), and the extends slot is entity.other.inherited-class. Declaration keywords carry keyword.declaration.* alongside storage.type.* for backwards compatibility, word operators carry keyword.operator.word alongside keyword.operator.logical, strings carry meta.string, and constant globals are variable.other.constant. Grammar-specific qualifiers sit only after a sanctioned prefix: constant.numeric.integer.other.fourcc, constant.numeric.float.real.",
+    "Strings are begin/end rules, and a single-quoted literal with no closing quote on its line falls back to one, because these literals only terminate at the closing quote (or end of file), never at a newline.",
     "Constructs that still lex as a single token but are not valid JASS (bad escapes, '$' or '0x' without digits, octal containing 8/9, wrong-length single-quoted literals, a lone '.', a '!' without '=', unrecognized characters) are scoped invalid.illegal.",
     "The globals block ends at 'endglobals' or recovers via lookahead at the next declaration/statement line, so a missing 'endglobals' cannot swallow the rest of the file. The end pattern wins same-offset ties against content patterns."
   ],
@@ -53,7 +55,7 @@
     },
 
     "string": {
-      "name": "string.quoted.double.jass",
+      "name": "meta.string.jass string.quoted.double.jass",
       "begin": "\"",
       "beginCaptures": {
         "0": { "name": "punctuation.definition.string.begin.jass" }
@@ -92,7 +94,7 @@
       "patterns": [
         {
           "comment": "The alternatives are every ordering of UTF-8 byte widths that sums to 4: 1+1+1+1, 1+1+2, 1+2+1, 2+1+1, 2+2, 1+3, 3+1, 4.",
-          "name": "constant.numeric.fourcc.jass",
+          "name": "constant.numeric.integer.other.fourcc.jass",
           "match": "(')((?:(?:[^'\\\\\\r\\n\\x{80}-\\x{10FFFF}]|\\\\[^\\r\\n\\x{80}-\\x{10FFFF}]){4}|(?:[^'\\\\\\r\\n\\x{80}-\\x{10FFFF}]|\\\\[^\\r\\n\\x{80}-\\x{10FFFF}]){2}\\\\?[\\x{80}-\\x{7FF}]|(?:[^'\\\\\\r\\n\\x{80}-\\x{10FFFF}]|\\\\[^\\r\\n\\x{80}-\\x{10FFFF}])\\\\?[\\x{80}-\\x{7FF}](?:[^'\\\\\\r\\n\\x{80}-\\x{10FFFF}]|\\\\[^\\r\\n\\x{80}-\\x{10FFFF}])|\\\\?[\\x{80}-\\x{7FF}](?:[^'\\\\\\r\\n\\x{80}-\\x{10FFFF}]|\\\\[^\\r\\n\\x{80}-\\x{10FFFF}]){2}|(?:\\\\?[\\x{80}-\\x{7FF}]){2}|(?:[^'\\\\\\r\\n\\x{80}-\\x{10FFFF}]|\\\\[^\\r\\n\\x{80}-\\x{10FFFF}])\\\\?[\\x{800}-\\x{FFFF}]|\\\\?[\\x{800}-\\x{FFFF}](?:[^'\\\\\\r\\n\\x{80}-\\x{10FFFF}]|\\\\[^\\r\\n\\x{80}-\\x{10FFFF}])|\\\\?[\\x{10000}-\\x{10FFFF}]))(')",
           "captures": {
             "1": { "name": "punctuation.definition.constant.begin.jass" },
@@ -145,7 +147,7 @@
           "match": "(?:\\$|0[xX])(?![0-9A-Fa-f])"
         },
         {
-          "name": "constant.numeric.real.jass",
+          "name": "constant.numeric.float.real.jass",
           "match": "[0-9]+\\.[0-9]*"
         },
         {
@@ -161,7 +163,7 @@
           "match": "[0-9]+"
         },
         {
-          "name": "constant.numeric.real.jass",
+          "name": "constant.numeric.float.real.jass",
           "match": "\\.[0-9]+"
         },
         {
@@ -192,7 +194,7 @@
           "match": "(?:call|set|debug)(?![0-9A-Za-z_])"
         },
         {
-          "name": "keyword.operator.logical.jass",
+          "name": "keyword.operator.word.jass keyword.operator.logical.jass",
           "match": "(?:and|not|or)(?![0-9A-Za-z_])"
         },
         {
@@ -216,7 +218,7 @@
           "match": "(?:endglobals|globals)(?![0-9A-Za-z_])"
         },
         {
-          "name": "storage.type.declaration.jass",
+          "name": "storage.type.jass",
           "match": "type(?![0-9A-Za-z_])"
         },
         {
@@ -232,7 +234,7 @@
 
     "function-call": {
       "comment": "Must come after #keywords so 'if (', 'not (' and 'return (' keep their keyword scope.",
-      "name": "entity.name.function.jass",
+      "name": "variable.function.jass",
       "match": "[A-Za-z_][0-9A-Za-z_]*(?=[ \\t]*\\()"
     },
 
@@ -267,12 +269,20 @@
           "match": ","
         },
         {
-          "name": "punctuation.parenthesis.jass",
-          "match": "[()]"
+          "name": "punctuation.section.parens.begin.jass",
+          "match": "\\("
         },
         {
-          "name": "punctuation.squarebracket.jass",
-          "match": "[\\[\\]]"
+          "name": "punctuation.section.parens.end.jass",
+          "match": "\\)"
+        },
+        {
+          "name": "punctuation.section.brackets.begin.jass",
+          "match": "\\["
+        },
+        {
+          "name": "punctuation.section.brackets.end.jass",
+          "match": "\\]"
         }
       ]
     },
@@ -284,24 +294,41 @@
     },
 
     "type-slot": {
-      "comment": "A position the parser treats as a type name. #keywords first, so primitives keep their storage.type.primitive scope and a stray keyword keeps its keyword scope.",
+      "comment": "A USAGE position the parser treats as a type name. #keywords first, so primitives keep their storage.type.primitive scope and a stray keyword keeps its keyword scope. The fallback is support.type rather than entity.name.type (definitions only): every non-primitive type a script can use is declared by common.j, so a type usage is a library reference. The type-declaration rule scopes its own definition and extends slots separately.",
       "patterns": [
         { "include": "#keywords" },
         {
-          "name": "entity.name.type.jass",
+          "name": "support.type.jass",
           "match": "[A-Za-z_][0-9A-Za-z_]*"
         }
       ]
     },
 
     "type-declaration": {
+      "comment": "The name slot is the one place a type is DEFINED (entity.name.type); the extends slot names the parent type (entity.other.inherited-class). Both still route through #keywords first, so 'extends handle' keeps handle's primitive scope.",
       "name": "meta.declaration.type.jass",
       "match": "^[ \\t]*(type)(?![0-9A-Za-z_])(?:[ \\t]+([A-Za-z_][0-9A-Za-z_]*))?(?:[ \\t]+(extends)(?![0-9A-Za-z_])(?:[ \\t]+([A-Za-z_][0-9A-Za-z_]*))?)?",
       "captures": {
-        "1": { "name": "storage.type.declaration.jass" },
-        "2": { "patterns": [{ "include": "#type-slot" }] },
+        "1": { "name": "storage.type.jass keyword.declaration.type.jass" },
+        "2": {
+          "patterns": [
+            { "include": "#keywords" },
+            {
+              "name": "entity.name.type.jass",
+              "match": "[A-Za-z_][0-9A-Za-z_]*"
+            }
+          ]
+        },
         "3": { "name": "keyword.other.jass" },
-        "4": { "patterns": [{ "include": "#type-slot" }] }
+        "4": {
+          "patterns": [
+            { "include": "#keywords" },
+            {
+              "name": "entity.other.inherited-class.jass",
+              "match": "[A-Za-z_][0-9A-Za-z_]*"
+            }
+          ]
+        }
       }
     },
 
@@ -322,32 +349,56 @@
     },
 
     "global-declaration": {
-      "name": "meta.declaration.global.jass",
-      "match": "^[ \\t]*(?:(constant)(?![0-9A-Za-z_])[ \\t]+)?([A-Za-z_][0-9A-Za-z_]*)[ \\t]+(?:(array)(?![0-9A-Za-z_])[ \\t]+)?([A-Za-z_][0-9A-Za-z_]*)",
-      "captures": {
-        "1": { "name": "storage.modifier.jass" },
-        "2": { "patterns": [{ "include": "#type-slot" }] },
-        "3": { "name": "storage.modifier.jass" },
-        "4": {
-          "patterns": [
-            { "include": "#keywords" },
-            {
-              "name": "variable.other.global.jass",
-              "match": "[A-Za-z_][0-9A-Za-z_]*"
+      "comment": "Two variants so the name slot can reflect constness (variable.other.constant): a capture's scope cannot depend on another capture, so the 'constant' form is its own rule, listed first to win the same-offset tie. A malformed 'constant NAME' line without a type fails the first variant and degrades through the second, where 'constant' lands in the type slot and keeps its modifier colour via routing.",
+      "patterns": [
+        {
+          "name": "meta.declaration.global.jass",
+          "match": "^[ \\t]*(constant)(?![0-9A-Za-z_])[ \\t]+([A-Za-z_][0-9A-Za-z_]*)[ \\t]+(?:(array)(?![0-9A-Za-z_])[ \\t]+)?([A-Za-z_][0-9A-Za-z_]*)",
+          "captures": {
+            "1": { "name": "storage.modifier.jass" },
+            "2": { "patterns": [{ "include": "#type-slot" }] },
+            "3": { "name": "storage.modifier.jass" },
+            "4": {
+              "patterns": [
+                { "include": "#keywords" },
+                {
+                  "name": "variable.other.constant.global.jass",
+                  "match": "[A-Za-z_][0-9A-Za-z_]*"
+                }
+              ]
             }
-          ]
+          }
+        },
+        {
+          "name": "meta.declaration.global.jass",
+          "match": "^[ \\t]*([A-Za-z_][0-9A-Za-z_]*)[ \\t]+(?:(array)(?![0-9A-Za-z_])[ \\t]+)?([A-Za-z_][0-9A-Za-z_]*)",
+          "captures": {
+            "1": { "patterns": [{ "include": "#type-slot" }] },
+            "2": { "name": "storage.modifier.jass" },
+            "3": {
+              "patterns": [
+                { "include": "#keywords" },
+                {
+                  "name": "variable.other.global.jass",
+                  "match": "[A-Za-z_][0-9A-Za-z_]*"
+                }
+              ]
+            }
+          }
         }
-      }
+      ]
     },
 
     "function-declaration": {
-      "comment": "Covers 'function' and single-line 'native' declarations; the region only spans the signature line, the body is handled by the line-anchored statement rules.",
-      "name": "meta.declaration.function.jass",
-      "begin": "^[ \\t]*(?:(constant)(?![0-9A-Za-z_])[ \\t]+)?(function|native)(?![0-9A-Za-z_])(?:[ \\t]+([A-Za-z_][0-9A-Za-z_]*))?",
+      "comment": "Covers 'function' and single-line 'native' declarations; the region only spans the signature line, the body is handled by the line-anchored statement rules. The wrapper region itself is unnamed so the meta.function scopes alternate instead of stacking: the begin match (including its trailing whitespace) is the meta.function head, and the takes/returns clauses are sibling regions. The name slot refuses 'takes'/'returns' so a signature missing its name still gets its clause regions.",
+      "begin": "^[ \\t]*((?:(constant)(?![0-9A-Za-z_])[ \\t]+)?(function|native)(?![0-9A-Za-z_])(?:[ \\t]+(?!(?:takes|returns)(?![0-9A-Za-z_]))([A-Za-z_][0-9A-Za-z_]*))?[ \\t]*)",
       "beginCaptures": {
-        "1": { "name": "storage.modifier.jass" },
-        "2": { "name": "storage.type.function.jass" },
-        "3": {
+        "1": { "name": "meta.function.jass" },
+        "2": { "name": "storage.modifier.jass" },
+        "3": { "name": "storage.type.function.jass keyword.declaration.function.jass" },
+        "4": {
+          "comment": "Needs its own meta.function name: a capture tokenized via sub-patterns does not inherit the enclosing capture 1's name.",
+          "name": "meta.function.jass",
           "patterns": [
             { "include": "#keywords" },
             {
@@ -360,10 +411,27 @@
       "end": "(?=$)",
       "patterns": [
         { "include": "#comment" },
+        { "include": "#function-parameters" },
+        { "include": "#function-return-type" },
+        { "include": "#keywords" },
         {
-          "name": "keyword.other.jass",
-          "match": "(?:takes|returns)(?![0-9A-Za-z_])"
+          "comment": "A lone identifier in a signature can only be a type.",
+          "name": "support.type.jass",
+          "match": "[A-Za-z_][0-9A-Za-z_]*"
         },
+        { "include": "#illegal" }
+      ]
+    },
+
+    "function-parameters": {
+      "comment": "The takes-clause, with the 'takes' keyword as its opening delimiter. Ends by lookahead at 'returns', a trailing comment, or end of line, so those all land outside the region. The end lookahead only wins ties at its own offset, which is why #parameter must refuse to consume 'returns' (see there).",
+      "name": "meta.function.parameters.jass",
+      "begin": "(takes)(?![0-9A-Za-z_])",
+      "beginCaptures": {
+        "1": { "name": "keyword.other.jass" }
+      },
+      "end": "(?=returns(?![0-9A-Za-z_])|[ \\t]*(?://|$))",
+      "patterns": [
         { "include": "#parameter" },
         {
           "name": "punctuation.separator.comma.jass",
@@ -371,8 +439,25 @@
         },
         { "include": "#keywords" },
         {
-          "comment": "A lone identifier in a signature can only be a return type.",
-          "name": "entity.name.type.jass",
+          "name": "support.type.jass",
+          "match": "[A-Za-z_][0-9A-Za-z_]*"
+        },
+        { "include": "#illegal" }
+      ]
+    },
+
+    "function-return-type": {
+      "comment": "The returns-clause. Ends by lookahead before a trailing comment or the end of the line.",
+      "name": "meta.function.return-type.jass",
+      "begin": "(returns)(?![0-9A-Za-z_])",
+      "beginCaptures": {
+        "1": { "name": "keyword.other.jass" }
+      },
+      "end": "(?=[ \\t]*(?://|$))",
+      "patterns": [
+        { "include": "#keywords" },
+        {
+          "name": "support.type.jass",
           "match": "[A-Za-z_][0-9A-Za-z_]*"
         },
         { "include": "#illegal" }
@@ -380,8 +465,8 @@
     },
 
     "parameter": {
-      "comment": "A 'type name' pair in a parameter list. The slot routing is what keeps signatures correct: both slots try #keywords first, so a keyword landing in either one keeps its keyword scope. This rule does match across the parameter list boundary - in 'takes nothing returns nothing' it matches 'nothing returns' as a pair, because it starts left of the takes/returns rule and the same-offset tie-break never comes into play - and the routing is all that leaves 'returns' scoped as a keyword. Being listed after the takes/returns rule settles only the genuine same-offset ties, such as the 'returns real' that follows a parameter list.",
-      "match": "([A-Za-z_][0-9A-Za-z_]*)[ \\t]+([A-Za-z_][0-9A-Za-z_]*)",
+      "comment": "A 'type name' pair in a parameter list. Both slots try #keywords first, so a keyword landing in either one keeps its keyword scope. The name slot refuses 'returns' because the pair starts left of where the enclosing parameters region's end lookahead fires: without the guard, 'takes nothing returns nothing' would match 'nothing returns' as a pair, consume the keyword, and hold the region open across the return type.",
+      "match": "([A-Za-z_][0-9A-Za-z_]*)[ \\t]+(?!returns(?![0-9A-Za-z_]))([A-Za-z_][0-9A-Za-z_]*)",
       "captures": {
         "1": { "patterns": [{ "include": "#type-slot" }] },
         "2": {
@@ -443,7 +528,7 @@
           "patterns": [
             { "include": "#keywords" },
             {
-              "name": "entity.name.function.jass",
+              "name": "variable.function.jass",
               "match": "[A-Za-z_][0-9A-Za-z_]*"
             }
           ]
@@ -460,7 +545,7 @@
           "patterns": [
             { "include": "#keywords" },
             {
-              "name": "entity.name.function.jass",
+              "name": "variable.function.jass",
               "match": "[A-Za-z_][0-9A-Za-z_]*"
             }
           ]
