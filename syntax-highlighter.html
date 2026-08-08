@@ -183,6 +183,8 @@
     padding: 12px 16px;
     white-space: pre;
     overflow: auto;
+    /* Both layers are overlaid, so their tab stops have to line up. */
+    tab-size: 4;
   }
   .body > pre { color: var(--c-d); pointer-events: none; overflow: hidden; }
   .body > textarea {
@@ -236,7 +238,7 @@
   .inspector .hint { color: var(--muted); font-style: italic; }
 
   footer { margin-top: 14px; font-size: 0.76rem; color: var(--muted); }
-  footer code { font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace; }
+  footer code, footer kbd { font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace; }
 </style>
 </head>
 <body>
@@ -268,6 +270,7 @@
     Tokenised in-browser by <code>vscode-textmate</code> + <code>vscode-oniguruma</code> — the engine
     VS&nbsp;Code uses — against <code>syntaxes/jass.tmLanguage.json</code>.
     Drop a file anywhere on the editor to load it.
+    <kbd>Tab</kbd>/<kbd>Shift</kbd>+<kbd>Tab</kbd> indent, <kbd>Esc</kbd> leaves the editor.
   </footer>
 </div>
 
@@ -512,6 +515,64 @@
   }
 
   srcEl.addEventListener("input", retokenizeIncremental);
+
+  // --- indentation ------------------------------------------------------
+
+  // Tab indents instead of moving focus, so Escape is the way out of the editor.
+  // Edits go through execCommand to keep the browser's native undo stack intact;
+  // the "input" event it fires drives retokenisation as usual.
+  function replaceRange(start, end, text, selStart, selEnd) {
+    srcEl.setSelectionRange(start, end);
+    if (!document.execCommand("insertText", false, text)) {
+      srcEl.value = srcEl.value.slice(0, start) + text + srcEl.value.slice(end);
+      retokenizeIncremental();
+    }
+    srcEl.setSelectionRange(selStart, selEnd);
+  }
+
+  srcEl.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { srcEl.blur(); return; }
+    if (e.key !== "Tab" || e.ctrlKey || e.altKey || e.metaKey) return;
+    e.preventDefault();
+
+    var value = srcEl.value;
+    var from = srcEl.selectionStart;
+    var to = srcEl.selectionEnd;
+
+    // Anything but a multi-line selection being indented is a plain insertion.
+    if (!e.shiftKey && value.slice(from, to).indexOf("\n") < 0) {
+      replaceRange(from, to, "\t", from + 1, from + 1);
+      return;
+    }
+
+    // Otherwise (un)indent every line the selection touches, whole lines at a time.
+    var lineStart = value.lastIndexOf("\n", from - 1) + 1;
+    var lineEnd = value.indexOf("\n", to);
+    if (lineEnd < 0) lineEnd = value.length;
+
+    var lines = value.slice(lineStart, lineEnd).split("\n");
+    var firstDelta = 0;
+    var totalDelta = 0;
+    for (var i = 0; i < lines.length; i++) {
+      var delta;
+      if (e.shiftKey) {
+        var indent = /^(\t| {1,4})/.exec(lines[i]);
+        delta = indent ? -indent[0].length : 0;
+        lines[i] = lines[i].slice(-delta);
+      } else {
+        delta = 1;
+        lines[i] = "\t" + lines[i];
+      }
+      if (i === 0) firstDelta = delta;
+      totalDelta += delta;
+    }
+
+    replaceRange(
+      lineStart, lineEnd, lines.join("\n"),
+      Math.max(lineStart, from + firstDelta),
+      Math.max(lineStart, to + totalDelta)
+    );
+  });
 
   function syncScroll() {
     var sc = inspecting ? hlEl : srcEl;
