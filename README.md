@@ -2,7 +2,7 @@
 
 A TextMate grammar for **JASS**, the original scripting language of Warcraft III.
 
-- **Try it in the browser: [drake53.github.io/language-jass](https://drake53.github.io/language-jass/)** — a live highlighter that tokenises with the same engine VS Code uses, against the grammar in this repository. Type, paste, or drop a `.j`/`.ai`/`.jass` file, and switch to *Inspect* to see the scope stack of any token.
+- **Try it in the browser: [drake53.github.io/language-jass](https://drake53.github.io/language-jass/)** — a live highlighter that tokenises with the same engine VS Code uses, against the grammar in this repository. Type, paste, or drop a `.j`/`.ai`/`.jass` file, and switch to *Inspect* to see the scope stack of any token. A theme toggle previews the colours as VS Code (Light+/Dark+), GitHub (prettylights), Warcraft (an original parchment-and-gold set), or TESH (the classic Trigger Editor Syntax Highlighter), each in light and dark mode.
 - Scope name: `source.jass`
 - Grammar: [`syntaxes/jass.tmLanguage.json`](syntaxes/jass.tmLanguage.json)
 - Editor configuration: [`language-configuration.json`](language-configuration.json)

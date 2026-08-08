@@ -19,8 +19,10 @@
   edit onward are retokenised, and tokenisation stops as soon as the TextMate rule
   stack converges with the cached stack of the following line.
 
-  The theme toggle picks the token colours, VS Code (Light+/Dark+) or
-  GitHub (Primer prettylights); mode cycles auto/light/dark independently.
+  The theme toggle picks the token colours: VS Code (Light+/Dark+), GitHub
+  (Primer prettylights), Warcraft (an original parchment-and-gold set), or
+  TESH (the classic Trigger Editor Syntax Highlighter); mode cycles
+  auto/light/dark independently.
 -->
 <script src="https://cdn.jsdelivr.net/npm/vscode-oniguruma@2.0.1/release/main.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/vscode-textmate@9.3.2/release/main.js"></script>
@@ -87,6 +89,83 @@
     --c-varc: light-dark(#0550ae, #79c0ff);
   }
 
+  /* Warcraft theme: an original parchment-and-gold homage to the game JASS
+     ships with (there is no real editor to copy here). The keywords split
+     into two readability groups: statement structure (openers like
+     function/local/set/call/loop plus extends/takes/returns) wears the WC3
+     UI gold, while modifiers (constant/array/debug) and primitive type
+     names share player-orange. Declared types are player-teal, functions
+     mage blue, constants an arcane purple shared with null/true/false,
+     and rawcode literals player-pink; comments are moss green and
+     strings copper (with pale-gold escapes), the classic pairing that
+     keeps them apart. Light mode is ink on parchment, dark mode the
+     same hues on dark wood. */
+  :root[data-palette="warcraft"] {
+    --panel: light-dark(#f7efdc, #16120c);
+    --border: light-dark(#decfa8, #3a3223);
+    --c-d: light-dark(#3b2f1b, #e8dcc0);
+    --c-cm: light-dark(#43701c, #74a05c);
+    --c-str: light-dark(#a3341e, #e08a63);
+    --c-num: light-dark(#8a4d00, #e0a458);
+    --c-lang: light-dark(#8033b8, #c88fe0);
+    --c-esc: light-dark(#8a5f00, #eed49c);
+    --c-inv: light-dark(#c01818, #ff6b61);
+    --c-kwc: light-dark(#7d5a00, #ffcc00);
+    --c-kwop: light-dark(#3b2f1b, #e8dcc0);
+    --c-kw: light-dark(#7d5a00, #ffcc00);
+    --c-kwd: light-dark(#b34700, #fe8a0e);
+    --c-mod: light-dark(#b34700, #fe8a0e);
+    --c-prim: light-dark(#b34700, #fe8a0e);
+    --c-fn: light-dark(#0f62a8, #69ccf0);
+    --c-fnv: light-dark(#0f62a8, #69ccf0);
+    --c-typ: light-dark(#00786a, #1ce6b9);
+    --c-sup: light-dark(#00786a, #1ce6b9);
+    --c-var: light-dark(#4a3d22, #d8c9a3);
+    --c-varo: light-dark(#4a3d22, #d8c9a3);
+    --c-varc: light-dark(#8033b8, #c88fe0);
+    --c-raw: light-dark(#a8247e, #e55bb0);
+  }
+
+  /* TESH theme: SFilip's Trigger Editor Syntax Highlighter, the JASS NewGen
+     look. Colours decoded from the default style table in TESH_main.lfm of
+     the released Delphi source (hiveworkshop.com/threads/tesh-source.211434;
+     TColor integers are BGR): comments #008800 italic; strings (italic),
+     numbers, true/false/null and known constants all #0000AA; keywords and
+     block keywords bold in the default black; operators - TESH's Scintilla
+     lexer includes brackets and commas - bold #AA5500; types bold #0055AA;
+     natives clPurple #800080; BJ functions clRed; rawcodes bold italic
+     underlined default; 'array' sits in TESH's Types list, not with the
+     modifiers. One scheme compromise: the grammar cannot tell natives, BJs
+     and user functions apart, so every call wears the natives purple. TESH
+     itself is light-only (a white Scintilla control inside the World
+     Editor); the dark side keeps each hue, lifted for contrast. */
+  :root[data-palette="tesh"] {
+    --panel: light-dark(#ffffff, #17191d);
+    --border: light-dark(#d6d9d3, #2e3237);
+    --c-d: light-dark(#000000, #d6dade);
+    --c-cm: light-dark(#008800, #55b855);
+    --c-str: light-dark(#0000aa, #7d9cff);
+    --c-num: light-dark(#0000aa, #7d9cff);
+    --c-lang: light-dark(#0000aa, #7d9cff);
+    --c-esc: light-dark(#0000aa, #7d9cff);
+    --c-inv: light-dark(#ff0000, #ff5c5c);
+    --c-kwc: light-dark(#000000, #d6dade);
+    --c-kwop: light-dark(#aa5500, #d69a4e);
+    --c-kw: light-dark(#000000, #d6dade);
+    --c-mod: light-dark(#000000, #d6dade);
+    --c-arr: light-dark(#0055aa, #58a6e6);
+    --c-prim: light-dark(#0055aa, #58a6e6);
+    --c-fn: light-dark(#000000, #d6dade);
+    --c-fnv: light-dark(#800080, #c97fc9);
+    --c-typ: light-dark(#0055aa, #58a6e6);
+    --c-sup: light-dark(#0055aa, #58a6e6);
+    --c-var: light-dark(#000000, #d6dade);
+    --c-varo: light-dark(#000000, #d6dade);
+    --c-varc: light-dark(#0000aa, #7d9cff);
+    --c-raw: light-dark(#000000, #d6dade);
+    --c-pun: light-dark(#aa5500, #d69a4e);
+  }
+
   * { box-sizing: border-box; }
   html, body { margin: 0; }
   body {
@@ -124,8 +203,10 @@
   :root[data-theme="light"] #schemebtn .i-light { display: block; }
   :root[data-theme="dark"] #schemebtn .i-dark { display: block; }
   .seg { display: inline-flex; }
+  .seg .btn { border-radius: 0; }
   .seg .btn:first-child { border-radius: 6px 0 0 6px; }
-  .seg .btn + .btn { border-radius: 0 6px 6px 0; margin-left: -1px; }
+  .seg .btn:last-child { border-radius: 0 6px 6px 0; }
+  .seg .btn + .btn { margin-left: -1px; }
   .seg .btn[aria-pressed="true"] { position: relative; z-index: 1; }
   .btn[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
   .btn:focus-visible, .filebtn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -199,6 +280,18 @@
   .kwc  { color: var(--c-kwc); }
   .kwop { color: var(--c-kwop); }
   .kw   { color: var(--c-kw); }
+  /* Finer keyword splits only the Warcraft palette colours separately;
+     the fallbacks keep them on the exact colour they had before the split
+     in the VS Code and GitHub palettes. Same idea for the rest: 'array'
+     (arr) falls back through the modifier chain, rawcode literals (raw)
+     to the number colour (only Warcraft and TESH set their own) and
+     brackets/commas (pun) to the default, which TESH alone styles. */
+  .kwd  { color: var(--c-kwd, var(--c-kwc)); }
+  .mod  { color: var(--c-mod, var(--c-kw)); }
+  .arr  { color: var(--c-arr, var(--c-mod, var(--c-kw))); }
+  .prim { color: var(--c-prim, var(--c-kw)); }
+  .raw  { color: var(--c-raw, var(--c-num)); }
+  .pun  { color: var(--c-pun, var(--c-d)); }
   .fn   { color: var(--c-fn); }
   .fnv  { color: var(--c-fnv); }
   .typ  { color: var(--c-typ); }
@@ -218,6 +311,15 @@
   /* github.com renders invalid.illegal as danger-on-danger-background (pl-ii),
      without VS Code's squiggle. */
   :root[data-palette="github"] .inv { text-decoration: none; }
+
+  /* TESH's identity is as much weight as colour: keywords, operators and
+     types bold, comments and strings italic, rawcodes all three plus
+     underline. Safe over the transparent textarea because monospace fonts
+     keep the same advance width in bold and italic, so the overlay stays
+     caret-aligned. */
+  :root[data-palette="tesh"] :is(.kw, .kwc, .kwd, .mod, .arr, .prim, .typ, .sup, .kwop, .pun) { font-weight: bold; }
+  :root[data-palette="tesh"] :is(.cm, .str, .esc) { font-style: italic; }
+  :root[data-palette="tesh"] .raw { font-weight: bold; font-style: italic; text-decoration: underline; }
 
   .inspector {
     background: var(--panel);
@@ -268,6 +370,12 @@
       <button class="btn" id="themegithub" aria-pressed="false" aria-label="GitHub token colours" title="GitHub token colours">
         <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
       </button>
+      <button class="btn" id="themewarcraft" aria-pressed="false" aria-label="Warcraft token colours" title="Warcraft token colours">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 4.5h14V7H5Zm1.8 2.5h2.4v10H6.8Zm4 0h2.4v10h-2.4Zm4 0h2.4v10h-2.4ZM5 17h14v2.5H5Z"/></svg>
+      </button>
+      <button class="btn" id="themetesh" aria-pressed="false" aria-label="TESH token colours" title="TESH (Trigger Editor Syntax Highlighter) token colours">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v3h4"/></svg>
+      </button>
     </div>
     <button class="btn" id="schemebtn" title="Cycle light/dark mode">
       <svg class="i-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18Z" fill="currentColor" stroke="none"/></svg>
@@ -289,7 +397,7 @@
   <footer>
     Tokenised in-browser by <code>vscode-textmate</code> + <code>vscode-oniguruma</code> — the engine
     VS&nbsp;Code uses — against <code>syntaxes/jass.tmLanguage.json</code>.
-    The theme toggle previews VS&nbsp;Code (Light+/Dark+) or GitHub (prettylights) colours.
+    The theme toggle previews VS&nbsp;Code (Light+/Dark+), GitHub (prettylights), Warcraft (parchment &amp; gold), or TESH (the classic Trigger Editor Syntax Highlighter) colours.
     Drop a file anywhere on the editor to load it.
     <kbd>Tab</kbd>/<kbd>Shift</kbd>+<kbd>Tab</kbd> indent, <kbd>Esc</kbd> leaves the editor.
   </footer>
@@ -332,16 +440,22 @@
   // the actual colours via the --c-* CSS variables.
   var RULES = [
     ["constant.character.escape", "esc"],
-    ["constant.character", "num"],
+    ["constant.character", "raw"],
+    ["constant.numeric.integer.other.fourcc", "raw"],
     ["constant.numeric", "num"],
     ["constant.language", "lang"],
     ["comment", "cm"],
     ["string", "str"],
     ["invalid", "inv"],
+    ["keyword.control.debug", "kwd"],
     ["keyword.control", "kwc"],
     ["keyword.operator.logical", "kw"],
     ["keyword.operator", "kwop"],
     ["keyword", "kw"],
+    ["storage.modifier.local", "kw"],
+    ["storage.modifier.array", "arr"],
+    ["storage.modifier", "mod"],
+    ["storage.type.primitive", "prim"],
     ["storage", "kw"],
     ["entity.name.function", "fn"],
     ["entity.name.type", "typ"],
@@ -351,7 +465,9 @@
     ["variable.other.constant", "varc"],
     ["variable.other", "varo"],
     ["variable.parameter", "var"],
-    ["variable", "var"]
+    ["variable", "var"],
+    ["punctuation.section", "pun"],
+    ["punctuation.separator", "pun"]
   ];
 
   function classify(scopes) {
@@ -381,6 +497,8 @@
   var modeBtn = document.getElementById("modebtn");
   var themeVsBtn = document.getElementById("themevscode");
   var themeGhBtn = document.getElementById("themegithub");
+  var themeWcBtn = document.getElementById("themewarcraft");
+  var themeTeshBtn = document.getElementById("themetesh");
   var schemeBtn = document.getElementById("schemebtn");
   var grammarPick = document.getElementById("grammarpick");
 
@@ -737,12 +855,14 @@
     applyMode(MODES[(MODES.indexOf(cur) + 1) % MODES.length]);
   });
 
-  var THEMES = ["vscode", "github"];
+  var THEMES = ["vscode", "github", "warcraft", "tesh"];
   function applyTheme(t) {
     if (t === "vscode") document.documentElement.removeAttribute("data-palette");
     else document.documentElement.setAttribute("data-palette", t);
     themeVsBtn.setAttribute("aria-pressed", String(t === "vscode"));
     themeGhBtn.setAttribute("aria-pressed", String(t === "github"));
+    themeWcBtn.setAttribute("aria-pressed", String(t === "warcraft"));
+    themeTeshBtn.setAttribute("aria-pressed", String(t === "tesh"));
     try { localStorage.setItem("jass-syntax-highlighter-palette", t); } catch (e) { /* private mode */ }
   }
   var savedTheme = null;
@@ -750,6 +870,8 @@
   applyTheme(THEMES.indexOf(savedTheme) >= 0 ? savedTheme : "vscode");
   themeVsBtn.addEventListener("click", function () { applyTheme("vscode"); });
   themeGhBtn.addEventListener("click", function () { applyTheme("github"); });
+  themeWcBtn.addEventListener("click", function () { applyTheme("warcraft"); });
+  themeTeshBtn.addEventListener("click", function () { applyTheme("tesh"); });
 
   // --- init -------------------------------------------------------------
 
